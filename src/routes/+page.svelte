@@ -16,6 +16,12 @@
 	$: groups = queryLightGroups($settings.hubIp, $settings.hubUsername);
 	const updateLightGroup = updateLightGroupMutation();
 
+	$: {
+		if ($groups?.data != null && $settings.selectedGroup == null) {
+			$settings.selectedGroup = Object.keys($groups.data)[0];
+		}
+	}
+
 	$: scenes = queryScenes($settings.hubIp, $settings.hubUsername);
 
 	const GESTURES: string[] = [
