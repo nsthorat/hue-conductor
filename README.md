@@ -2,6 +2,10 @@
 
 The Philips Hue Conductor is an app that lets
 
+https://github.com/nsthorat/hue-conductor/assets/1100749/b2b8c32f-9e2c-40cb-8c13-e922ba63ffd9
+
+
+
 ## Developing
 
 Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
