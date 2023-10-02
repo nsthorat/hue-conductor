@@ -50,6 +50,10 @@ Victory: ✌️
 ILoveYou: '🤟
 ```
 
+## Caveats
+
+This currently will only work from localhost or 127.0.0.1 as it requires a non-https request to a local IP address.
+
 ## Developing
 
 ```bash
