@@ -50,6 +50,8 @@ Victory: ✌️
 ILoveYou: '🤟
 ```
 
+<img width="800" alt="image" src="https://github.com/nsthorat/hue-conductor/assets/1100749/14e29bb6-ab36-4fb5-a410-03c82e001523">
+
 ## Caveats
 
 This currently will only work from localhost or 127.0.0.1 as it requires a non-https request to a local IP address.
