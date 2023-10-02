@@ -22,12 +22,6 @@ npx hue-conductor
 
 You will need both the IP, and the username that you create via the '/api' request outlined in the docs above.
 
-If you use the default message body provided, Tthe username will be `my_hue_app`:
-
-```
-{"devicetype":"my_hue_app#iphone peter"}
-```
-
 ## Controlling the lights
 
 Before you can begin controlling lights, you must create two things from the Philips Hue app:
