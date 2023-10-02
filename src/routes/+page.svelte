@@ -1,186 +1,293 @@
 <script lang="ts">
-	import BrightnessSlider from '$lib/components/BrightnessSlider.svelte';
 	import CameraTracker from '$lib/components/CameraTracker.svelte';
-	import Switch from '$lib/components/ui/switch/switch.svelte';
+	import { clickOutside } from '$lib/components/clickOutside';
 	import {
 		queryLightGroups,
+		queryScenes,
 		updateLightGroupMutation,
-		type GroupAction
+		type Scene
 	} from '$lib/queries/lightGroupQueries';
+	import { createSettingsStore, type Gesture } from '$lib/stores/settingsStore';
 	import type { GestureRecognizerResult } from '@mediapipe/tasks-vision';
-	import { onMount } from 'svelte';
+	import { Dialog, DialogOverlay, DialogTitle, Switch } from '@rgossiaux/svelte-headlessui';
 
-	const groups = queryLightGroups();
+	const settings = createSettingsStore();
+
+	$: groups = queryLightGroups($settings.hubIp, $settings.hubUsername);
 	const updateLightGroup = updateLightGroupMutation();
 
-	let lightId: string | null = null;
+	$: scenes = queryScenes($settings.hubIp, $settings.hubUsername);
 
-	// Important keypoints
-	// 0: the bottom part of wrist
-	// 8: tip of index finger.
-	const INDEX_FINGER_IDX = 8;
+	const GESTURES: string[] = [
+		'None',
+		'Closed_Fist',
+		'Open_Palm',
+		'Pointing_Up',
+		'Thumb_Down',
+		'Thumb_Up',
+		'Victory',
+		'ILoveYou'
+	];
+	const DISPLAY_GESTURES: Record<string, string> = {
+		None: 'None',
+		Closed_Fist: 'Fist',
+		Open_Palm: 'Open Palm',
+		Pointing_Up: 'Pointing Up',
+		Thumb_Down: 'Thumb Down',
+		Thumb_Up: 'Thumb Up',
+		Victory: 'Victory',
+		ILoveYou: 'I Love You'
+	};
+	const GESTURE_EMOJI_MAP: Record<string, string> = {
+		None: ' ',
+		Closed_Fist: '✊',
+		Open_Palm: '🖐️',
+		Pointing_Up: '☝️',
+		Thumb_Down: '👎',
+		Thumb_Up: '👍',
+		Victory: '✌️',
+		ILoveYou: '🤟'
+	};
+	function changeGroupScene(select: EventTarget | null, gesture: string) {
+		if (select == null || $settings.selectedGroup == null) return;
 
-	$: console.log('groups', $groups.data);
-
-	let groupToggles: { [key: number]: boolean } = { 83: true };
-	$: groupsOn = Object.entries(groupToggles)
-		.filter(([id, on]) => on)
-		.map(([id, on]) => id);
-
-	let inited = true;
-	$: {
-		if (!inited) {
-			if (lightId == null && $groups.data != null) {
-				lightId = Object.keys($groups.data)[0];
-				let first = true;
-				for (const id in $groups.data) {
-					groupToggles[id] = first;
-					first = false;
-				}
-			}
-			inited = true;
-		}
+		settings.setGroupGestureScene(
+			$settings.selectedGroup,
+			gesture,
+			(select as HTMLInputElement).value
+		);
 	}
-	$: console.log('TOGGLES', groupToggles);
 
-	let on = true;
+	let on = false;
 
 	let gestures: GestureRecognizerResult | null = null;
 
-	function setLightGroupBrightness(id: number, bri: number) {
-		const lightUpdate = { groupId: +id, action: { bri } };
-		$updateLightGroup.mutate([[lightUpdate]]);
-	}
+	let curGesture: string | null = null;
+	let curScene: Scene | null = null;
 
-	// function setLightGroupHueSaturationBrightness(
-	// 	id: number,
-	// 	hue: number,
-	// 	saturation: number,
-	// 	brightness: number
-	// ) {
-	// 	$updateLightGroup.mutate([+id, { hue, sat: saturation, bri: brightness }]);
-	// }
-
-	function update() {
-		if (!on || groupsOn.length === 0) return;
-		console.log(',,,updatng');
-		const landmark =
-			gestures?.landmarks != null && gestures?.landmarks.length > 0 ? gestures.landmarks[0] : null;
-		if (landmark != null && landmark?.length > 0) {
-			const updates = groupsOn
-				.map((id) => {
-					const hue = Math.floor(
-						256 * 256 * Math.min(Math.max(1 - landmark[INDEX_FINGER_IDX].x, 0), 1)
-					);
-					const sat = 255;
-					const lightness = Math.floor(
-						256 * Math.min(Math.max(1 - landmark[INDEX_FINGER_IDX].y, 0), 1)
-					);
-
-					let on: boolean | undefined = undefined;
-					const action: Partial<GroupAction> = {};
-					if (curGesture === 'Closed_Fist') {
-						on = false;
-					} else if (curGesture === 'Open_Palm') {
-						on = true;
-					}
-					if (on) {
-						action.bri = lightness;
-						action.sat = sat;
-						action.hue = hue;
-						action.on = true;
-					}
-					console.log('g = ', curGesture, action);
-
-					return {
-						groupId: +id,
-						action
-					};
-				})
-				.filter((i) => i.action.bri != null);
-			console.log('UPDATING FROM FINGER', updates);
-			$updateLightGroup.mutate([updates]);
+	let settingsOpen = false;
+	$: {
+		if ($settings.hubIp == null || $settings.hubUsername == null || $groups.isError) {
+			settingsOpen = true;
 		}
 	}
-	onMount(() => {
-		setInterval(() => {
-			update();
-		}, 1000);
-	});
-
-	// $: console.log(gestures);
-	// $: console.log('GESTURE=', curGesture);
-	let curGesture: string | null = null;
-
-	$: console.log('new gestury cateogyr:', curGesture);
-
+	$: {
+		if ($settings.hubIp == null || $settings.hubUsername == null) {
+			settingsOpen = true;
+		}
+	}
 	function updateGesture(gestureCategory: string | null) {
-		if (gestureCategory == null) return;
+		if (gestureCategory == null || $settings.selectedGroup == null) return;
 		curGesture = gestureCategory;
 		if (on) {
-			if (groupsOn.length > 0) {
-				console.log('UPDATING FROM FIST--------');
-
-				if (gestureCategory === 'Closed_Fist') {
-					//Object.keys($groups.data || {}).forEach((id) => {
-					// setLightGroupBrightness(+id, 0);
-					// setLightGroupOn(+id, false);
-					const lightUpdates = groupsOn.map((i) => {
-						return { groupId: +i, action: { on: false } };
-					});
-					console.log([$updateLightGroup]);
-					// $updateLightGroup.mutate([{ updates: [{ groupId: 83, action: { on: false } }] }]);
-					$updateLightGroup.mutate([lightUpdates]);
-					//});
-				} else if (gestureCategory === 'Open_Palm') {
-					//Object.keys($groups.data || {}).forEach((id) => {
-					// setLightGroupBrightness(+id, 255);
-					// setLightGroupOn(+id, true);
-					const lightUpdates = groupsOn.map((i) => {
-						return { groupId: +i, action: { on: true } };
-					});
-					$updateLightGroup.mutate([lightUpdates]);
+			if ($settings.selectedGroup != null) {
+				const scene =
+					$settings.groupGestureSceneMap[$settings.selectedGroup][gestureCategory as Gesture] ||
+					null;
+				if (scene == null) {
+					curScene = null;
+					return;
 				}
+				curScene = ($scenes.data || {})[scene];
+
+				$updateLightGroup.mutate([
+					[{ groupId: +$settings.selectedGroup, action: { scene } }],
+					$settings.hubIp,
+					$settings.hubUsername
+				]);
+				return;
 			}
 		}
 	}
+
+	// Filter all the scenes to only the ones in the selected group.
+	$: groupScenes = Object.fromEntries(
+		Object.entries($scenes.data || {}).filter(([_, scene]) => {
+			return `${scene.group}` === $settings.selectedGroup;
+		})
+	);
+
+	$: gestureSceneMap =
+		$settings.selectedGroup != null && $settings.groupGestureSceneMap != null
+			? $settings.groupGestureSceneMap[$settings.selectedGroup] || {}
+			: {};
+
+	function handleWindowKeyDown(event: KeyboardEvent) {
+		if (event.key === 'Escape') {
+			settingsOpen = false;
+		}
+	}
+	window.addEventListener('keydown', handleWindowKeyDown);
 </script>
 
-<div class="flex flex-row">
-	<div class="flex flex-col m-4">
+<div class="flex h-screen w-full flex-row">
+	<div class="absolute h-screen w-full">
+		<CameraTracker bind:gestures on:gesture_change={(e) => updateGesture(e.detail)} />
+	</div>
+
+	<div class="absolute m-4 flex flex-col">
 		{#if $groups.data == null}
 			<div>Loading...</div>
 		{:else}
-			<div class="flex flex-row mb-2">
-				<div class="w-40">Enable</div>
-				<Switch bind:checked={on} />
+			<div class="mb-2 flex flex-row">
+				<div class="w-24 text-white">Enable</div>
+				<Switch bind:checked={on} class={on ? 'switch switch-enabled' : 'switch switch-disabled'}>
+					<span class="sr-only">Enable</span>
+					<span class="toggle" />
+				</Switch>
 			</div>
-
-			<!-- {#each Object.entries({}) as [id, group]} -->
-			{#each Object.entries($groups.data) as [id, group]}
-				<div class="flex flex-row">
-					{(console.log(`${group.action.bri}`), '')}
-					<div>{id}</div>
-					<div class="w-40">{group.name}</div>
-					<div class="w-96">
-						{#key id}
-							<BrightnessSlider
-								{group}
-								on:change={(e) => {
-									setLightGroupBrightness(+id, e.detail);
-								}}
-							/>
-						{/key}
-					</div>
-					<div>
-						<Switch bind:checked={groupToggles[id]} />
-					</div>
-				</div>
-			{/each}
+			<button class="mt-4 w-36 rounded bg-neutral-400 py-2" on:click={() => (settingsOpen = true)}
+				>Settings</button
+			>
 		{/if}
 	</div>
-
-	<CameraTracker bind:gestures on:gesture_change={(e) => updateGesture(e.detail)} />
+	<div
+		class="absolute bottom-0 left-1/2 z-40 flex -translate-x-1/2 -translate-y-1/4 flex-col items-center rounded-md text-white opacity-80"
+	>
+		<div class="flex flex-row">
+			<div class="w-64">
+				<div class="mb-4 text-xl text-neutral-300">Gesture</div>
+				{#if curGesture != null}
+					<div class="text-4xl text-violet-400">
+						{DISPLAY_GESTURES[curGesture]}
+					</div>
+				{:else}
+					<div class="text-4xl text-neutral-400">No gesture</div>
+				{/if}
+			</div>
+			<div class="w-64">
+				<div class="mb-4 text-xl text-neutral-300">Scene</div>
+				<div class="h-16 text-4xl text-violet-400">
+					{#if curScene?.name != null}
+						{curScene?.name}
+					{/if}
+				</div>
+			</div>
+		</div>
+	</div>
 </div>
 
-{curGesture}
+<Dialog
+	class="absolute left-1/2 top-1/2 z-40 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 opacity-90"
+	bind:open={settingsOpen}
+>
+	<DialogOverlay />
+
+	<div use:clickOutside={() => (settingsOpen = false)}>
+		<DialogTitle class="mb-8 text-2xl">
+			<div>Settings</div>
+			<div class="text-sm font-light">Settings are saved in your browser.</div>
+		</DialogTitle>
+
+		<div class="flex flex-col gap-y-8">
+			<div class="flex w-full flex-col gap-y-2">
+				<div class="mb-2 flex flex-row gap-x-32">
+					<div class="flex flex-col">
+						<div class="w-64 font-medium">Hue Bridge IP Address</div>
+					</div>
+					<div class="font-light">
+						<input bind:value={$settings.hubIp} type="text" placeholder="192.168.1.1" />
+					</div>
+				</div>
+				<div class="mb-2 flex flex-row gap-x-32">
+					<div class="flex flex-col">
+						<div class="w-64 font-medium">Hue Username</div>
+					</div>
+					<div class="font-light">
+						<input type="text" bind:value={$settings.hubUsername} placeholder="my_hue_app" />
+					</div>
+				</div>
+				<div class="w-96">
+					<a class="text-blue-600" href="https://developers.meethue.com/develop/get-started-2/"
+						>Philips Hue Documentation</a
+					>
+				</div>
+			</div>
+			{#if $groups.error != null}
+				<div>
+					<div class="text-red-500">{$groups.error}</div>
+					<div>Check the IP address and username and try again.</div>
+				</div>
+			{/if}
+			{#if $groups.isFetching}
+				Loading...
+			{/if}
+			{#if $settings.hubIp != null && $settings.hubUsername != null && $groups.error == null && !$groups.isFetching}
+				<div class="mb-2 flex flex-row gap-x-32">
+					<div class="w-64 font-medium">Hue Light Group</div>
+					<div class="font-light">
+						<select bind:value={$settings.selectedGroup}>
+							{#each Object.entries($groups.data || []) as [id, group]}
+								<option value={id}>{group.name}</option>
+							{/each}
+						</select>
+					</div>
+				</div>
+
+				<div class="flex flex-col gap-y-2">
+					<div class="mb-2 font-medium">Gesture to Hue scene map</div>
+					{#each GESTURES as gesture}
+						<div class="flex flex-row gap-x-32 font-light">
+							<div class="flex w-64 flex-row">
+								<div class="mr-4 w-12 whitespace-pre text-3xl">{GESTURE_EMOJI_MAP[gesture]}</div>
+								{DISPLAY_GESTURES[gesture]}
+							</div>
+							<div>
+								<select
+									value={gestureSceneMap[gesture] || 'null'}
+									on:change={(e) => changeGroupScene(e.target, gesture)}
+								>
+									<option value="null">None</option>
+									{#each Object.entries(groupScenes) as [id, scene]}
+										<option value={id}>{scene.name}</option>
+									{/each}
+								</select>
+							</div>
+						</div>
+					{/each}
+				</div>
+				<button class="rounded bg-teal-300 py-4" on:click={() => (settingsOpen = false)}
+					>Close</button
+				>
+			{/if}
+		</div>
+	</div>
+</Dialog>
+
+<style lang="postcss">
+	:global(.switch) {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		border-radius: 9999px;
+		height: 1.5rem;
+		width: 2.75rem;
+	}
+
+	:global(.switch-enabled) {
+		/* Blue */
+		background-color: rgb(50 150 200);
+		/* @apply bg-red; */
+	}
+
+	:global(.switch-disabled) {
+		/* Gray */
+		background-color: rgb(229 231 235);
+	}
+
+	.toggle {
+		display: inline-block;
+		width: 1rem;
+		height: 1rem;
+		background-color: rgb(255 255 255);
+		border-radius: 9999px;
+	}
+
+	:global(.switch.switch-enabled .toggle) {
+		transform: translateX(1.5rem);
+	}
+
+	:global(.switch.switch-disabled .toggle) {
+		transform: translateX(0.25rem);
+	}
+</style>

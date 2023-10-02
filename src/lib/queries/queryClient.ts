@@ -4,6 +4,11 @@ import { writable } from 'svelte/store';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const apiErrors = writable<any[]>([]);
 
+interface ApiError {
+	body: {
+		detail: string;
+	};
+}
 export const queryClient = new QueryClient({
 	defaultOptions: {
 		queries: {
@@ -13,18 +18,14 @@ export const queryClient = new QueryClient({
 			staleTime: Infinity,
 			retry: false,
 			onError: (err) => {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				console.error((err as any).body?.detail);
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				apiErrors.update((errs) => [...errs, err as any]);
+				console.error((err as ApiError).body?.detail);
+				apiErrors.update((errs) => [...errs, err as ApiError]);
 			}
 		},
 		mutations: {
 			onError: (err) => {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				console.error((err as any).body?.detail);
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				apiErrors.update((errs) => [...errs, err as any]);
+				console.error((err as ApiError).body?.detail);
+				apiErrors.update((errs) => [...errs, err as ApiError]);
 			}
 		}
 	}

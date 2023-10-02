@@ -36,8 +36,14 @@
 			video.play();
 			loading = false;
 		} catch (error) {
-			console.log(error);
+			console.error(error);
 		}
+
+		await new Promise<void>((resolve) => {
+			video!.addEventListener('loadedmetadata', () => {
+				resolve();
+			});
+		});
 
 		// Create the hand landmarker.
 		await createGestureRecognizer();
@@ -46,14 +52,10 @@
 		if (!startedSetup && canvas != null && video != null && !webcamRunning) {
 			startedSetup = true;
 			setup().then(() => {
-				canvas!.style.width = `${video!.videoWidth}px`;
-				canvas!.style.height = `${video!.videoHeight}px`;
 				canvas!.setAttribute('width', `${video!.videoWidth}`);
 				canvas!.setAttribute('height', `${video!.videoHeight}`);
 
 				webcamRunning = true;
-
-				console.log('-------GOING');
 				predictWebcam();
 			});
 		}
@@ -71,12 +73,7 @@
 			},
 			runningMode: 'VIDEO'
 		});
-
-		console.log('CREATING HAND LANDMARKER');
-
-		// demosSection.classList.remove('invisible');
 	};
-	console.log('....', GestureRecognizer.HAND_CONNECTIONS);
 
 	async function predictWebcam() {
 		if (
@@ -87,11 +84,8 @@
 			drawingUtil == null
 		)
 			return;
-		// console.log(video);
-		console;
 
 		// Now let's start detecting the stream.
-
 		if (video.videoHeight != 0) {
 			let startTimeMs = performance.now();
 			if (lastVideoTime !== video.currentTime) {
@@ -103,7 +97,6 @@
 			canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
 			if (gestures.landmarks) {
 				for (const landmarks of gestures.landmarks) {
-					// landmarks[0].x = 0;
 					drawingUtil.drawConnectors(landmarks, GestureRecognizer.HAND_CONNECTIONS, {
 						color: '#00FF00',
 						lineWidth: 2
@@ -127,20 +120,26 @@
 	}
 </script>
 
-<div>
+<div class="flex w-full flex-row items-center">
 	{#if loading}
 		<h1>loading..</h1>
 	{/if}
-	<div class="relative">
+	<div class="relative w-full">
 		<!-- svelte-ignore a11y-media-has-caption -->
-		<video class="flip-x" id="webcam" autoplay playsinline bind:this={video} />
-		<canvas bind:this={canvas} id="output_canvas" class="flip-x absolute top-0 left-0" />
+		<video
+			class="flip-x absolute left-1/2 top-0 h-screen"
+			id="webcam"
+			autoplay
+			playsinline
+			bind:this={video}
+		/>
+		<canvas bind:this={canvas} id="output_canvas" class="flip-x absolute left-1/2 top-0 h-screen" />
 	</div>
 </div>
 
 <style>
 	.flip-x {
-		-webkit-transform: scaleX(-1);
-		transform: scaleX(-1);
+		-webkit-transform: scaleX(-1) translateX(50%);
+		transform: scaleX(-1) translateX(50%);
 	}
 </style>

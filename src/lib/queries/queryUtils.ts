@@ -5,17 +5,15 @@ import {
 	type CreateQueryOptions
 } from '@tanstack/svelte-query';
 
-const apiQueryKey = (tags: string[], endpoint: string, ...args: unknown[]) => [
-	...tags,
-	endpoint,
-	...args
-];
+const apiQueryKey = (tags: string[], endpoint: string, ...args: unknown[]) => {
+	console.log('key:', [...tags, endpoint, ...args]);
+	return [...tags, endpoint, ...args];
+};
 export function createApiQuery<
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	TQueryFn extends (...args: any[]) => Promise<any>,
 	TQueryFnData = Awaited<ReturnType<TQueryFn>>,
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	TError = any,
+	TError = unknown,
 	TData = TQueryFnData
 >(
 	endpoint: TQueryFn,
@@ -38,8 +36,7 @@ export function createApiMutation<
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	TMutationFn extends (...args: any[]) => Promise<any>,
 	TData = Awaited<ReturnType<TMutationFn>>,
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	TError = any,
+	TError = unknown,
 	TVariables = Parameters<TMutationFn>
 >(endpoint: TMutationFn, mutationArgs: CreateMutationOptions<TData, TError, TVariables> = {}) {
 	return () =>

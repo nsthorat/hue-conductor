@@ -1,14 +1,6 @@
-import { queryClient } from './queryClient';
-import { createApiMutation } from './queryUtils';
-import { createApiQuery } from './queryUtils';
+import { createApiMutation, createApiQuery } from './queryUtils';
 
 export const LIGHT_GROUPS = 'light_groups';
-
-const POLL_TIME_MS = 10_000;
-
-const ipAddress = '10.10.10.80';
-// {"devicetype":"hue_conductor#web"}
-const username = 'CyMV-e3MvDaKz8AoAPIWfBs7oaTQ3ArLV-LVy2dn';
 
 export interface GroupAction {
 	alert: string;
@@ -26,26 +18,49 @@ interface Group {
 	action: GroupAction;
 }
 
-async function getGroups() {
-	console.log('getting groups....');
+async function getGroups(ipAddress: string | null, username: string | null) {
+	if (ipAddress == null || username == null) return null;
 	const response = await fetch(`http://${ipAddress}/api/${username}/groups`);
 	const json = await response.json();
+	if (json[0]?.error != null) {
+		throw new Error(json[0].error.description);
+	}
 	return json as { [idx: number]: Group };
 }
-export const queryLightGroups = createApiQuery(getGroups, LIGHT_GROUPS, {
-	staleTime: POLL_TIME_MS,
-	refetchInterval: POLL_TIME_MS,
-	refetchIntervalInBackground: false,
-	refetchOnWindowFocus: true
-});
+export const queryLightGroups = createApiQuery(getGroups, LIGHT_GROUPS);
+
+export interface Scene {
+	name: string;
+	type: string;
+	group: string;
+}
+async function getScenes(ipAddress: string | null, username: string | null) {
+	if (ipAddress == null || username == null) return null;
+
+	const response = await fetch(`http://${ipAddress}/api/${username}/scenes`);
+	const json = await response.json();
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
+	if (json[0]?.error != null) {
+		throw new Error(json[0].error.description);
+	}
+	return json as { [sceneId: string]: Scene };
+}
+
+export const queryScenes = createApiQuery(getScenes, 'scenes');
 
 export interface LightUpdate {
 	groupId: number;
-	action: Partial<GroupAction>;
+	action: Partial<GroupAction & { scene: string }>;
 }
 
-export async function updateLightGroup(updates: LightUpdate[]) {
-	console.log('~~~~~MAKING REQUEST TO CHANGE LIGHT~~~~', updates);
+export async function updateLightGroup(
+	updates: LightUpdate[],
+	ipAddress: string | null,
+	username: string | null
+) {
+	if (ipAddress == null || username == null) return null;
+
 	const requests = updates.map(({ groupId, action }) => {
 		return fetch(`http://${ipAddress}/api/${username}/groups/${groupId}/action`, {
 			method: 'PUT',
@@ -55,8 +70,4 @@ export async function updateLightGroup(updates: LightUpdate[]) {
 	return await Promise.all(requests);
 }
 
-export const updateLightGroupMutation = createApiMutation(updateLightGroup, {
-	onSuccess: () => {
-		queryClient.invalidateQueries([LIGHT_GROUPS]);
-	}
-});
+export const updateLightGroupMutation = createApiMutation(updateLightGroup, {});
