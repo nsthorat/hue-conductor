@@ -1,30 +1,59 @@
-# Hue Conductor
+# Philips Hue Conductor
 
-The Philips Hue Conductor is an app that lets
+The Philips Hue Conductor is an app that lets you control Hue lights from a webcam with hand-gestures, using the [MediaPipe hand gesture library](https://developers.google.com/mediapipe/solutions/vision/gesture_recognizer).
 
 https://github.com/nsthorat/hue-conductor/assets/1100749/b2b8c32f-9e2c-40cb-8c13-e922ba63ffd9
 
+## Running the webserver
 
+```sh
+bunx hue-conductor
+```
+
+or
+
+```sh
+npx hue-conductor
+```
+
+## Philips Hue Bridge IP and Username
+
+[Detailed documentation on finding your Hue Bridge](https://developers.meethue.com/develop/get-started-2/)
+
+You will need both the IP, and the username that you create via the '/api' request outlined in the docs above.
+
+If you use the default message body provided, Tthe username will be `my_hue_app`:
+
+```
+{"devicetype":"my_hue_app#iphone peter"}
+```
+
+## Controlling the lights
+
+Before you can begin controlling lights, you must create two things from the Philips Hue app:
+
+1. A group of lights. I only allow controlling groups to control latency.
+2. Scenes for groups you want to control. Just like groups, I only allow controlling scenes to control latency.
+
+Once you do this, in settings you can map each of the gestures to a scene:
+
+7 gestures from MediaPipe gesture recognition:
+
+```
+None
+Closed_Fist: ✊
+Open_Palm: 🖐️,
+Pointing_Up: ☝️
+Thumb_Down: 👎
+Thumb_Up: 👍
+Victory: ✌️
+ILoveYou: '🤟
+```
 
 ## Developing
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
 ```bash
-npm run dev
+bun install
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+bun run dev -- --open
 ```
-
-## Building
-
-To create a production version of your app:
-
-```bash
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
